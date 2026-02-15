@@ -1,0 +1,11 @@
+Timestamp,Model,Latency_ms,Status
+2026-02-09 22:33:53,moondream,0,Error 404
+2026-02-09 22:33:55,llava,0,Error 500
+2026-02-10 20:49:05,moondream,0,Error 500
+2026-02-10 20:49:06,llava,0,Error 500
+2026-02-10 20:50:29,moondream,0,"HTTPConnectionPool(host='localhost', port=11434): Max retries exceeded with url: /api/generate (Caused by NewConnectionError('<urllib3.connection.HTTPConnection object at 0xffff7fa570d0>: Failed to establish a new connection: [Errno 111] Connection refused'))"
+2026-02-10 20:50:29,llava,0,"HTTPConnectionPool(host='localhost', port=11434): Max retries exceeded with url: /api/generate (Caused by NewConnectionError('<urllib3.connection.HTTPConnection object at 0xffff7fa57880>: Failed to establish a new connection: [Errno 111] Connection refused'))"
+2026-02-10 20:54:01,moondream,0,"HTTPConnectionPool(host='localhost', port=11434): Max retries exceeded with url: /api/generate (Caused by NewConnectionError('<urllib3.connection.HTTPConnection object at 0xffffabbe70d0>: Failed to establish a new connection: [Errno 111] Connection refused'))"
+2026-02-10 20:54:01,llava,0,"HTTPConnectionPool(host='localhost', port=11434): Max retries exceeded with url: /api/generate (Caused by NewConnectionError('<urllib3.connection.HTTPConnection object at 0xffffabbe7880>: Failed to establish a new connection: [Errno 111] Connection refused'))"
+2026-02-10 20:59:01,moondream,25815.7,Success
+2026-02-10 20:59:04,llava,0,Error 500

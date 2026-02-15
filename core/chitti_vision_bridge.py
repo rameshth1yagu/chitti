@@ -63,7 +63,7 @@ def capture_and_analyze():
                 print(f"[{get_now()}] 🤖 Chitti sees: {description}")
                 print(f"[{get_now()}] ⏱️ Inference Latency: {round(t_inf_end - t_inf_start, 2)}s")
 
-                speak_and_record(description)
+                speak(description)
             else:
                 print(f"[{get_now()}] ⚠️ AI Error: {response.status_code}")
 
@@ -82,17 +82,22 @@ def capture_and_analyze():
             
         print(f"[{get_now()}] 🏁 Total Cycle Time: {round(time.time() - start_total, 2)}s")
 
-def speak_and_record(text):
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    filename = f"/home/rameshthiyagu/chitti/data/logs/speech_{timestamp}.wav"
-    
-    # Generate the audio file
-    subprocess.run(["espeak", text, "-w", filename])
-    
-    # Play it (if speakers are connected)
-    subprocess.run(["aplay", filename])
-    
-    print(f"[{get_now()}] 🎙️ Speech recorded to: {filename}")
+def speak(text):
+    """
+    Ephemeral TTS - audio exists ONLY in memory pipeline, never touches disk.
+    Pipes espeak stdout directly to aplay for zero-persistence audio playback.
+    """
+    # Create espeak process with stdout pipe
+    espeak = subprocess.Popen(["espeak", text, "--stdout"], stdout=subprocess.PIPE)
+
+    # Pipe audio directly to aplay (no disk write)
+    subprocess.run(["aplay", "-q"], stdin=espeak.stdout)
+
+    # Clean up pipe
+    espeak.stdout.close()
+    espeak.wait()
+
+    print(f"[{get_now()}] 🔊 Chitti spoke (ephemeral audio - zero persistence)")
 
 if __name__ == "__main__":
     capture_and_analyze()
