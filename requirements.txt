@@ -1,0 +1,57 @@
+# Project Chitti - Cognitive Edge Sentry
+# Python Dependencies for Phase 1
+
+# ============================================================================
+# Core Vision & AI
+# ============================================================================
+opencv-python==4.10.0.84          # Camera capture and image processing
+numpy==1.26.4                      # Numerical operations
+requests==2.32.3                   # Ollama REST API client
+
+# ============================================================================
+# Jetson-Specific Hardware
+# ============================================================================
+# Jetson.GPIO - MUST be installed from system apt, not pip
+# See: sudo apt-get install python3-jetson-gpio
+Jetson.GPIO>=2.1.6; platform_machine=="aarch64"
+
+# Servo control (PCA9685 PWM driver)
+adafruit-circuitpython-pca9685==3.4.21
+adafruit-servokit==1.3.6
+
+# Jetson monitoring and telemetry
+jetson-stats==4.2.8                # jtop for thermal/power profiling
+
+# ============================================================================
+# Testing & Development
+# ============================================================================
+pytest==8.3.2                      # Test framework
+pytest-cov==5.0.0                  # Coverage reporting
+pytest-mock==3.14.0                # Mocking for GPIO tests
+
+# ============================================================================
+# Data Analysis & Visualization (Phase 1 thermal profiling)
+# ============================================================================
+matplotlib==3.9.2                  # Thermal profile charts
+pandas==2.2.2                      # CSV analysis for benchmarks
+
+# ============================================================================
+# System-Level Dependencies (apt)
+# ============================================================================
+# These must be installed via apt-get on Jetson:
+# - espeak-ng: Text-to-speech engine
+# - alsa-utils: Audio playback (aplay)
+# - i2c-tools: I²C bus scanning (i2cdetect)
+# - v4l-utils: Camera verification (v4l2-ctl)
+#
+# Install command:
+# sudo apt-get update && sudo apt-get install -y \
+#   espeak-ng alsa-utils i2c-tools v4l-utils python3-jetson-gpio
+
+# ============================================================================
+# NOTES
+# ============================================================================
+# - This requirements.txt is for pip install on Jetson ONLY
+# - Mac development: Install only opencv-python, numpy, requests, pytest
+# - Jetson.GPIO will fail on non-ARM platforms (expected)
+# - Version pins based on JetPack 6.1 / Ubuntu 22.04 compatibility
