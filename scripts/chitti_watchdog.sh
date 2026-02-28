@@ -1,17 +1,16 @@
 #!/bin/bash
+export PATH=$PATH:/usr/local/bin:/usr/bin:/bin
+# Force Ollama to use YOUR model directory
+export OLLAMA_MODELS=/home/rameshthiyagu/.ollama/models
 
-# 1. Hardening with absolute paths
-sudo /usr/bin/nvpmodel -m 0
-sudo /usr/bin/sync && echo 3 | sudo /usr/bin/tee /proc/sys/vm/drop_caches
-
-# 2. Cleanup - Kill any existing instances to prevent port conflicts
-sudo /usr/bin/systemctl stop ollama 2>/dev/null
-sudo /usr/bin/killall ollama 2>/dev/null
-
-# 3. Privacy-First Environment
-export GGML_CUDA_ENABLE_UNIFIED_MEMORY=1
-export OLLAMA_KEEP_ALIVE=0
-
-# 4. Launch (Stay in foreground so the service doesn't deactivate)
-echo "🚀 Starting Chitti Brain (Ollama) in Privacy-First mode..."
-/usr/local/bin/ollama serve
+while true; do
+  if ! curl -s http://127.0.0.1:11434/api/tags | grep -q "moondream"; then
+    echo "$(date): Moondream not found. Restarting server..."
+    # Kill any ghost instances first
+    pkill -9 ollama
+    /usr/local/bin/ollama serve > /home/rameshthiyagu/chitti/ollama.log 2>&1 &
+    sleep 20
+  fi
+  echo 1 | tee /proc/sys/vm/compact_memory > /dev/null
+  sleep 300
+done
