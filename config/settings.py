@@ -32,8 +32,11 @@ SERVO_CHANNELS: Final[int] = 16  # Number of PWM channels
 SHM_DIR: Final[Path] = Path("/dev/shm/chitti")
 SHM_FRAME_PATH: Final[Path] = SHM_DIR / "frame.jpg"
 
+# Project data directory
+DATA_DIR: Final[Path] = Path.home() / "chitti" / "data"
+
 # Logs and evidence (text-only data, no images/audio)
-LOG_DIR: Final[Path] = Path("/var/log/chitti")
+LOG_DIR: Final[Path] = DATA_DIR / "logs"
 EVIDENCE_DIR: Final[Path] = Path.home() / "chitti" / "docs" / "evidence"
 PHASE_01_EVIDENCE: Final[Path] = EVIDENCE_DIR / "phase_01"
 

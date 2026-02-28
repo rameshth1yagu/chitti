@@ -43,9 +43,6 @@ class TTSEngine:
         """
         Speak text using ephemeral audio pipeline.
 
-        Audio is piped from espeak stdout directly to aplay stdin.
-        No intermediate file is created. Zero audio persistence.
-
         Args:
             text: Text to synthesize and speak
             blocking: If True, wait for speech to complete
@@ -58,58 +55,39 @@ class TTSEngine:
             return False
 
         try:
-            # Create espeak process with stdout pipe
-            espeak = subprocess.Popen(
-                ["espeak", text, "--stdout"],
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE
-            )
-
-            # Pipe audio directly to aplay (no disk write)
-            aplay = subprocess.run(
-                ["aplay", "-q"],  # -q for quiet mode
-                stdin=espeak.stdout,
-                stderr=subprocess.PIPE,
-                timeout=30 if blocking else None
-            )
-
-            # Clean up pipe
-            if espeak.stdout:
-                espeak.stdout.close()
-
-            espeak.wait()
-
-            if espeak.returncode == 0 and aplay.returncode == 0:
-                logger.info(
-                    "tts_speak_success",
-                    extra={
-                        "text_length": len(text),
-                        "blocking": blocking,
-                    }
-                )
-                return True
-            else:
-                logger.error(
-                    "tts_speak_failed",
-                    extra={
-                        "espeak_rc": espeak.returncode,
-                        "aplay_rc": aplay.returncode,
-                    }
-                )
-                return False
-
+            return self._pipe_audio(text, blocking)
         except subprocess.TimeoutExpired:
             logger.error("tts_timeout")
             return False
         except FileNotFoundError as e:
-            logger.error(
-                "tts_command_not_found",
-                extra={"error": str(e)}
-            )
+            logger.error("tts_command_not_found", extra={"error": str(e)})
             return False
         except Exception as e:
-            logger.error(
-                "tts_unexpected_error",
-                extra={"error": str(e)}
-            )
+            logger.error("tts_unexpected_error", extra={"error": str(e)})
             return False
+
+    def _pipe_audio(self, text: str, blocking: bool) -> bool:
+        """Pipe espeak stdout directly to aplay — zero disk persistence."""
+        espeak = subprocess.Popen(
+            ["espeak", text, "--stdout"],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+        aplay = subprocess.run(
+            ["aplay", "-q"],
+            stdin=espeak.stdout,
+            stderr=subprocess.PIPE,
+            timeout=30 if blocking else None,
+        )
+        if espeak.stdout:
+            espeak.stdout.close()
+        espeak.wait()
+
+        if espeak.returncode == 0 and aplay.returncode == 0:
+            logger.info("tts_speak_success", extra={"text_length": len(text)})
+            return True
+
+        logger.error("tts_speak_failed", extra={
+            "espeak_rc": espeak.returncode, "aplay_rc": aplay.returncode,
+        })
+        return False

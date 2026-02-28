@@ -112,84 +112,62 @@ class VLMClient:
             prompt: Query prompt for VLM
 
         Returns:
-            Dict with 'response' (str) and 'latency_sec' (float)
-            None if inference fails
-
-        Raises:
-            ValueError: If image not in /dev/shm
+            Dict with 'response' (str) and 'latency_sec' (float),
+            or None if inference fails.
         """
-        import time
-
-        # Encode image
         try:
             img_base64 = self.encode_image(image_path)
         except (FileNotFoundError, ValueError) as e:
             logger.error("image_encode_failed", extra={"error": str(e)})
             return None
 
-        # Prepare payload
         payload = {
             "model": self.model,
             "prompt": prompt,
             "stream": False,
-            "images": [img_base64]
+            "images": [img_base64],
         }
+        logger.info("inference_start", extra={"model": self.model})
 
-        logger.info(
-            "inference_start",
-            extra={
-                "model": self.model,
-                "prompt": prompt,
-            }
-        )
+        response = self._call_ollama(payload)
+        if response is None:
+            return None
+        return self._parse_response(response)
 
-        # Call Ollama API
-        t_start = time.time()
+    def _call_ollama(
+        self, payload: Dict[str, Any]
+    ) -> Optional[requests.Response]:
+        """Send payload to Ollama and return the raw response."""
         try:
-            response = requests.post(
-                self.url,
-                json=payload,
-                timeout=self.timeout
+            resp = requests.post(
+                self.url, json=payload, timeout=self.timeout
             )
-            t_end = time.time()
-            latency_sec = round(t_end - t_start, 3)
-
-            if response.status_code == 200:
-                result = response.json()
-                description = result.get('response', '')
-
-                logger.info(
-                    "inference_success",
-                    extra={
-                        "latency_sec": latency_sec,
-                        "response_length": len(description),
-                    }
-                )
-
-                return {
-                    "response": description,
-                    "latency_sec": latency_sec,
-                    "model": self.model,
-                }
-            else:
+            if resp.status_code != 200:
                 logger.error(
                     "inference_api_error",
-                    extra={
-                        "status_code": response.status_code,
-                        "latency_sec": latency_sec,
-                    }
+                    extra={"status_code": resp.status_code},
                 )
                 return None
-
+            return resp
         except requests.exceptions.Timeout:
-            logger.error(
-                "inference_timeout",
-                extra={"timeout": self.timeout}
-            )
+            logger.error("inference_timeout", extra={"timeout": self.timeout})
             return None
         except requests.exceptions.RequestException as e:
-            logger.error(
-                "inference_request_failed",
-                extra={"error": str(e)}
-            )
+            logger.error("inference_request_failed", extra={"error": str(e)})
             return None
+
+    def _parse_response(self, response: requests.Response) -> Dict[str, Any]:
+        """Extract description and latency from a successful Ollama response."""
+        result = response.json()
+        description = result.get("response", "")
+        latency_sec = round(response.elapsed.total_seconds(), 3)
+
+        logger.info(
+            "inference_success",
+            extra={"latency_sec": latency_sec, "response_length": len(description)},
+        )
+        return {
+            "response": description,
+            "latency_sec": latency_sec,
+            "model": self.model,
+        }

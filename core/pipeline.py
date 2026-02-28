@@ -10,7 +10,8 @@ Complete perception cycle with cryptographic proof of zero data persistence.
 
 import logging
 import time
-from typing import Dict, Any, Optional
+from pathlib import Path
+from typing import Dict, Any, Optional, Tuple
 from datetime import datetime
 
 from core.camera import CameraCapture
@@ -39,31 +40,11 @@ class PerceptionPipeline:
         self.vlm = VLMClient()
         self.privacy = PrivacyGate()
         self.tts = TTSEngine()
-
         logger.info("pipeline_init_complete")
 
-    def run_cycle(self) -> Optional[Dict[str, Any]]:
-        """
-        Execute one complete perception cycle.
-
-        Returns:
-            Dict with cycle metrics:
-            - timestamp: ISO timestamp
-            - capture_success: bool
-            - inference_result: dict or None
-            - tts_success: bool
-            - audit_result: dict
-            - total_latency_sec: float
-
-        Returns None if cycle fails critically.
-        """
-        cycle_start = time.time()
-        timestamp = datetime.now().isoformat()
-
-        logger.info("cycle_start", extra={"timestamp": timestamp})
-
-        # Initialize result
-        result: Dict[str, Any] = {
+    def _new_result(self, timestamp: str) -> Dict[str, Any]:
+        """Create an empty cycle result dict."""
+        return {
             "timestamp": timestamp,
             "capture_success": False,
             "inference_result": None,
@@ -72,68 +53,66 @@ class PerceptionPipeline:
             "total_latency_sec": 0.0,
         }
 
-        try:
-            # STEP 1: Start SSD audit
-            self.privacy.start_audit()
+    def _capture_step(self) -> Tuple[bool, Optional[Path]]:
+        """Capture a frame and return (success, frame_path)."""
+        success, _frame, frame_path = self.camera.capture_frame()
+        if not success or frame_path is None:
+            logger.error("cycle_failed_capture")
+        return success, frame_path
 
-            # STEP 2: Capture frame
-            success, frame, frame_path = self.camera.capture_frame()
+    def _inference_step(
+        self, frame_path: Path, result: Dict[str, Any]
+    ) -> None:
+        """Run VLM inference and TTS, updating result in place."""
+        inference_result = self.vlm.infer(frame_path)
+        result["inference_result"] = inference_result
+        if inference_result is None:
+            logger.error("cycle_failed_inference")
+            return
+
+        description = inference_result.get("response", "")
+        if description:
+            result["tts_success"] = self.tts.speak(description)
+        else:
+            logger.warning("cycle_no_description_to_speak")
+
+    def run_cycle(self) -> Optional[Dict[str, Any]]:
+        """
+        Execute one complete perception cycle.
+
+        Returns:
+            Dict with cycle metrics, or None on critical failure.
+        """
+        cycle_start = time.time()
+        timestamp = datetime.now().isoformat()
+        logger.info("cycle_start", extra={"timestamp": timestamp})
+        result = self._new_result(timestamp)
+
+        try:
+            self.privacy.start_audit()
+            success, frame_path = self._capture_step()
             result["capture_success"] = success
 
             if not success or frame_path is None:
-                logger.error("cycle_failed_capture")
-                # Still purge and audit even on failure
                 result["audit_result"] = self.privacy.enforce_cycle()
                 return result
 
-            # STEP 3: VLM Inference
-            inference_result = self.vlm.infer(frame_path)
-            result["inference_result"] = inference_result
+            self._inference_step(frame_path, result)
+            result["audit_result"] = self.privacy.enforce_cycle(frame_path)
+            result["total_latency_sec"] = round(time.time() - cycle_start, 3)
 
-            if inference_result is None:
-                logger.error("cycle_failed_inference")
-                # Purge and audit
-                result["audit_result"] = self.privacy.enforce_cycle(frame_path)
-                return result
-
-            # STEP 4: TTS Output (ephemeral)
-            description = inference_result.get("response", "")
-            if description:
-                tts_success = self.tts.speak(description)
-                result["tts_success"] = tts_success
-            else:
-                logger.warning("cycle_no_description_to_speak")
-
-            # STEP 5: Privacy Purge & Audit
-            audit_result = self.privacy.enforce_cycle(frame_path)
-            result["audit_result"] = audit_result
-
-            # STEP 6: Compute metrics
-            cycle_end = time.time()
-            result["total_latency_sec"] = round(cycle_end - cycle_start, 3)
-
-            logger.info(
-                "cycle_complete",
-                extra={
-                    "total_latency_sec": result["total_latency_sec"],
-                    "zero_retention": audit_result.get("zero_retention_verified", False),
-                }
-            )
-
+            logger.info("cycle_complete", extra={
+                "total_latency_sec": result["total_latency_sec"],
+                "zero_retention": result["audit_result"].get("zero_retention_verified", False),
+            })
             return result
 
         except Exception as e:
-            logger.error(
-                "cycle_exception",
-                extra={"error": str(e), "type": type(e).__name__}
-            )
-
-            # Emergency purge attempt
+            logger.error("cycle_exception", extra={"error": str(e), "type": type(e).__name__})
             try:
                 self.privacy.purge_frame()
-            except:
+            except Exception:
                 pass
-
             return None
 
     def run_single_cycle(self) -> Optional[Dict[str, Any]]:
